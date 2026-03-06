@@ -1,0 +1,1658 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ingás Blokkoldó Asszisztens</title>
+    <script src="https://cdn.jsdelivr.net/npm/docx@7.8.2/build/index.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #f5f3ff 0%, #ede9fe 50%, #fce7f3 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container { max-width: 1000px; margin: 0 auto; }
+        .card {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            padding: 24px;
+            margin-bottom: 24px;
+        }
+        .header { text-align: center; }
+        .header h1 { font-size: 2rem; color: #9333ea; margin-bottom: 8px; }
+        .header p { color: #6b7280; font-size: 0.875rem; }
+        .progress-info {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 16px;
+            font-size: 0.875rem;
+            font-weight: 600;
+        }
+        .progress-bar-container {
+            width: 100%;
+            height: 12px;
+            background: #e5e7eb;
+            border-radius: 999px;
+            overflow: hidden;
+            margin-bottom: 16px;
+        }
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(to right, #9333ea, #ec4899);
+            transition: width 0.5s ease;
+        }
+        .steps-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(40px, 1fr));
+            gap: 4px;
+            margin-top: 16px;
+        }
+        .step-icon {
+            text-align: center;
+            font-size: 1.25rem;
+            transition: all 0.3s;
+            cursor: pointer;
+            padding: 8px 4px;
+            border-radius: 8px;
+        }
+        .step-icon.active { 
+            color: #9333ea; 
+            font-weight: bold; 
+            transform: scale(1.2); 
+            background: #f3e8ff;
+        }
+        .step-icon.completed { color: #10b981; }
+        .step-icon.pending { color: #9ca3af; }
+        .content-card h2 {
+            font-size: 1.5rem;
+            color: #1f2937;
+            margin-bottom: 24px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .info-box { padding: 16px; border-radius: 8px; margin-bottom: 24px; }
+        .info-box.blue { background: #eff6ff; border-left: 4px solid #3b82f6; color: #1e40af; }
+        .info-box.purple { background: #faf5ff; border-left: 4px solid #a855f7; color: #6b21a8; }
+        .info-box.yellow { background: #fefce8; border: 1px solid #fde047; color: #854d0e; }
+        .info-box.green { background: #f0fdf4; border: 1px solid #86efac; color: #15803d; }
+        .question-box {
+            background: #fef3c7;
+            border-left: 4px solid #f59e0b;
+            padding: 16px;
+            border-radius: 8px;
+            margin-bottom: 16px;
+            font-weight: 600;
+            color: #92400e;
+        }
+        .btn {
+            width: 100%;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-top: 8px;
+        }
+        .btn-primary { background: #3b82f6; color: white; }
+        .btn-primary:hover { background: #2563eb; }
+        .btn-purple { background: #9333ea; color: white; }
+        .btn-purple:hover { background: #7e22ce; }
+        .btn-secondary { background: #d1d5db; color: #374151; }
+        .btn-secondary:hover { background: #9ca3af; }
+        .btn-download { background: #8b5cf6; color: white; margin-top: 12px; }
+        .btn-download:hover { background: #7c3aed; }
+        .btn-skip { background: #fbbf24; color: #78350f; }
+        .btn-skip:hover { background: #f59e0b; }
+        .btn-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-top: 16px;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.6);
+            z-index: 1000;
+            padding: 20px;
+            overflow-y: auto;
+        }
+        .modal.active { display: flex; align-items: center; justify-content: center; }
+        .modal-content {
+            background: white;
+            border-radius: 16px;
+            padding: 32px;
+            max-width: 900px;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+        .diagram-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+            gap: 10px;
+            margin-top: 16px;
+        }
+        .diagram-button {
+            background: #faf5ff;
+            border: 2px solid #d8b4fe;
+            color: #6b21a8;
+            padding: 10px 8px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: background 0.3s, border-color 0.3s;
+            font-size: 0.9rem;
+            white-space: nowrap;
+            min-width: 0;
+            width: 100%;
+            box-sizing: border-box;
+            overflow: hidden;
+            text-overflow: clip;
+        }
+        .diagram-button:hover { background: #f3e8ff; transform: translateY(-2px); }
+        .diagram-button.selected { 
+            background: #9333ea; 
+            color: white; 
+            border-color: #7e22ce;
+        }
+        .answer-display {
+            background: #f9fafb;
+            padding: 12px;
+            border-radius: 8px;
+            margin: 8px 0;
+            text-align: left;
+        }
+        .answer-label {
+            font-weight: 600;
+            color: #6b21a8;
+            margin-bottom: 4px;
+        }
+        .answer-value {
+            color: #1f2937;
+        }
+        .slider-container {
+            margin: 24px 0;
+        }
+        .slider-group {
+            margin-bottom: 24px;
+        }
+        .slider-group label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 12px;
+            color: #6b21a8;
+            font-size: 1.1rem;
+        }
+        .slider-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+        .slider {
+            flex: 1;
+            height: 8px;
+            border-radius: 4px;
+            background: #e5e7eb;
+            outline: none;
+            -webkit-appearance: none;
+        }
+        .slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: #9333ea;
+            cursor: pointer;
+        }
+        .slider::-moz-range-thumb {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: #9333ea;
+            cursor: pointer;
+            border: none;
+        }
+        .slider-value {
+            min-width: 50px;
+            font-weight: bold;
+            color: #9333ea;
+            font-size: 1.2rem;
+        }
+        .generated-text {
+            background: #f0fdf4;
+            border: 2px solid #86efac;
+            padding: 16px;
+            border-radius: 8px;
+            margin: 16px 0;
+            line-height: 1.8;
+            white-space: pre-wrap;
+            text-align: left;
+            min-height: 200px;
+        }
+        input[type="text"], textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #d8b4fe;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-family: inherit;
+        }
+        textarea {
+            min-height: 150px;
+            resize: vertical;
+        }
+        .summary-section {
+            margin-top: 24px;
+        }
+        .summary-section h3 {
+            color: #7e22ce;
+            margin-bottom: 16px;
+        }
+        .notes-section {
+            margin-top: 24px;
+            border-top: 2px dashed #d8b4fe;
+            padding-top: 16px;
+        }
+        .notes-section label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 600;
+            color: #7e22ce;
+            margin-bottom: 8px;
+            font-size: 0.95rem;
+        }
+        .notes-section textarea {
+            min-height: 80px;
+            border-color: #d8b4fe;
+            background: #faf5ff;
+            font-size: 0.9rem;
+        }
+        .notes-section textarea:focus {
+            outline: none;
+            border-color: #9333ea;
+            background: #fff;
+        }
+        @media (max-width: 768px) {
+            .header h1 { font-size: 1.5rem; }
+            .btn-grid { grid-template-columns: 1fr; }
+            .steps-grid { grid-template-columns: repeat(auto-fit, minmax(35px, 1fr)); }
+        }
+        .search-btn {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            background: #9333ea;
+            color: white;
+            border: none;
+            border-radius: 50px;
+            padding: 12px 20px;
+            font-size: 1rem;
+            font-weight: 700;
+            cursor: pointer;
+            box-shadow: 0 4px 16px rgba(147,51,234,0.4);
+            z-index: 500;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.3s;
+        }
+        .search-btn:hover { background: #7e22ce; transform: translateY(-2px); }
+        .search-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 600;
+            align-items: flex-start;
+            justify-content: center;
+            padding: 60px 20px 20px;
+        }
+        .search-overlay.active { display: flex; }
+        .search-panel {
+            background: white;
+            border-radius: 16px;
+            padding: 24px;
+            width: 100%;
+            max-width: 620px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+            max-height: 80vh;
+            display: flex;
+            flex-direction: column;
+        }
+        .search-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+        .search-input {
+            flex: 1;
+            padding: 12px 16px;
+            border: 2px solid #d8b4fe;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-family: inherit;
+            outline: none;
+        }
+        .search-input:focus { border-color: #9333ea; }
+        .search-close {
+            background: #e5e7eb;
+            border: none;
+            border-radius: 8px;
+            padding: 10px 14px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 700;
+            color: #374151;
+        }
+        .search-close:hover { background: #d1d5db; }
+        .search-results {
+            overflow-y: auto;
+            flex: 1;
+        }
+        .search-result-item {
+            padding: 12px 14px;
+            border-radius: 8px;
+            cursor: pointer;
+            margin-bottom: 6px;
+            transition: background 0.2s;
+            border-left: 4px solid transparent;
+        }
+        .search-result-item:hover { background: #f3e8ff; border-left-color: #9333ea; }
+        .search-result-type {
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            color: #9333ea;
+            margin-bottom: 2px;
+        }
+        .search-result-title {
+            font-weight: 600;
+            color: #1f2937;
+            font-size: 0.95rem;
+        }
+        .search-result-sub {
+            font-size: 0.82rem;
+            color: #6b7280;
+            margin-top: 2px;
+        }
+        .search-highlight { background: #fde68a; border-radius: 2px; padding: 0 2px; }
+        .search-empty { text-align: center; color: #9ca3af; padding: 32px; font-size: 0.95rem; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="card header">
+            <h1>🎯 Ingás Blokkoldó Asszisztens</h1>
+            <p>Fókusz – Feltárás – Oldás – Integráció</p>
+        </div>
+
+        <div class="card">
+            <div class="progress-info">
+                <span id="stepInfo">0/32 lépés</span>
+                <span id="percentInfo">0%</span>
+            </div>
+            <div class="progress-bar-container">
+                <div class="progress-bar" id="progressBar" style="width: 0%"></div>
+            </div>
+            <div class="steps-grid" id="stepsGrid"></div>
+        </div>
+
+        <div class="card content-card" id="contentCard"></div>
+
+        <div class="card" id="navigationCard" style="display: none;">
+            <div class="btn-grid">
+                <button class="btn btn-secondary" onclick="prevStep()">← Vissza</button>
+                <button class="btn btn-purple" onclick="nextStep()">Tovább →</button>
+            </div>
+        </div>
+    </div>
+
+    <button class="search-btn" onclick="openSearch()">🔍 Keresés</button>
+
+    <div class="search-overlay" id="searchOverlay" onclick="closeSearchOnOverlay(event)">
+        <div class="search-panel">
+            <div class="search-header">
+                <input type="text" class="search-input" id="searchInput" placeholder="Keresés lépések, opciók, jegyzetek között..." oninput="doSearch()">
+                <button class="search-close" onclick="closeSearch()">✕</button>
+            </div>
+            <div class="search-results" id="searchResults">
+                <div class="search-empty">Kezdj el gépelni a kereséshez...</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" id="diagramModal">
+        <div class="modal-content">
+            <h3 id="diagramTitle">Diagram</h3>
+            <div class="question-box" id="diagramQuestion"></div>
+            <div id="diagramContent"></div>
+        </div>
+    </div>
+
+    <script>
+let currentStep = 0;
+let completedSteps = [];
+let selectedOptions = [];
+let sessionData = {
+    answers: {},
+    notes: {},
+    notesOnDoc: {},
+    measurements: { initial: null, final: null },
+    temValues: { Testi: 0, Erzelmi: 0, Mentalis: 0 },
+    releasingTexts: '',
+    integratingTexts: '',
+    timestamp: null,
+    clientName: '',
+    kezeloiMegjegyzes: '',
+    kovetkezoKezeles: '',
+    kliensAllapot: ''
+};
+
+const steps = [
+    { id: 0, name: 'Ráhangolódás', icon: '🎯' },
+    { id: 1, name: 'Engedélyezés', icon: '✋', diagram: 'igenNem', question: 'Engedélyezett-e most a blokkoldó munka?' },
+    { id: 2, name: 'Életterület', icon: '🌍', diagram: 'eletterulet', question: 'Melyik életterületen jelentkezik ez a blokk?', multiple: true },
+    { id: 3, name: 'Kezdeti mérés', icon: '📊', diagram: 'szazalek', question: 'Mennyire erős ez a blokk jelenleg? (0-100%)' },
+    { id: 4, name: 'Érzelmi Gyökér', icon: '🌱', diagram: 'erzelmGyoker', question: 'Mi az érzelmi gyökere ennek a blokknak?', multiple: true },
+    { id: 5, name: 'Negatív Érzelem', icon: '💭', diagram: 'erzelem', question: 'Mely negatív érzelem dominál?', multiple: true },
+    { id: 6, name: 'Trauma', icon: '🔍', diagram: 'trauma', question: 'Van-e traumatikus esemény a háttérben?', multiple: true },
+    { id: 7, name: 'Lelki Sérülés', icon: '💔', diagram: 'lelkiSerules', question: 'Milyen lelki sérülés húzódik meg mögötte?', multiple: true },
+    { id: 8, name: 'Kapcsolati Gyökér', icon: '👥', diagram: 'kapcsolat', question: 'Melyik kapcsolathoz köthető ez a blokk?', multiple: true },
+    { id: 9, name: 'Blokk Eredete', icon: '⏳', diagram: 'eredet', question: 'Mikor keletkezett ez a blokk?', multiple: true },
+    { id: 10, name: 'Hiedelmek', icon: '🧠', diagram: 'hiedelem', question: 'Milyen korlátozó hiedelem áll a háttérben?', multiple: true },
+    { id: 11, name: 'Testi Érintettség', icon: '🫀', diagram: 'test', question: 'A test mely része érintett?', multiple: true },
+    { id: 12, name: 'Csakra', icon: '🌈', diagram: 'csakra', question: 'Melyik csakra érintett?', multiple: true },
+    { id: 13, name: 'Blokk Jellege', icon: '🔷', diagram: 'blokkJelleg', question: 'Milyen jellegű ez a blokk?', multiple: true },
+    { id: 14, name: 'TEM - Testi', icon: '🫀', diagram: 'szazalek', question: 'Testi szint mérése (0-100%)' },
+    { id: 15, name: 'TEM - Érzelmi', icon: '💭', diagram: 'szazalek', question: 'Érzelmi szint mérése (0-100%)' },
+    { id: 16, name: 'TEM - Mentális', icon: '🧠', diagram: 'szazalek', question: 'Mentális szint mérése (0-100%)' },
+    { id: 17, name: 'TEM Mérés', icon: '🔺' },
+    { id: 18, name: 'Védekezés', icon: '🛡️', diagram: 'vedekezes', question: 'Milyen védekezési mechanizmus működik?', multiple: true },
+    { id: 19, name: 'Életszerep', icon: '🎭', diagram: 'szerepek', question: 'Melyik életszerepben jelentkezik ez a blokk?', multiple: true },
+    { id: 20, name: 'Szabotázs', icon: '🚫', diagram: 'szabotazs', question: 'Milyen önszabotázs minta jelenik meg?', multiple: true },
+    { id: 21, name: 'Másodl. Haszon', icon: '🔐', diagram: 'haszon', question: 'Mi a másodlagos haszna a blokknak?', multiple: true },
+    { id: 22, name: 'Fogadalmak', icon: '🕊️', diagram: 'fogadalom', question: 'Van-e fogadalom vagy eskü a háttérben?', multiple: true },
+    { id: 23, name: 'Mikroszkóp', icon: '🔬', diagram: 'mikroszkop', question: 'Van-e mélyebb réteg, amit meg kell vizsgálni?', multiple: true },
+    { id: 24, name: 'Készültség', icon: '⚡', diagram: 'igenNem', question: 'Készen áll a kliens az oldásra?' },
+    { id: 25, name: 'Oldás', icon: '✨' },
+    { id: 26, name: 'Pozitív Érzelem', icon: '😊', diagram: 'pozitivErzelem', question: 'Milyen pozitív érzelmet szeretne érezni helyette?', multiple: true },
+    { id: 27, name: 'Új Hit', icon: '💫', diagram: 'ujHit', question: 'Milyen új hitet szeretne magáévá tenni?', multiple: true },
+    { id: 28, name: 'Színek', icon: '🎨', diagram: 'szinek', question: 'Mely szín támogatja a gyógyulást?', multiple: true },
+    { id: 29, name: 'Kristályok', icon: '💎', diagram: 'kristaly', question: 'Mely kristály segít az integrációban?', multiple: true },
+    { id: 30, name: 'Záró mérés', icon: '📈', diagram: 'szazalek', question: 'Mennyire erős a blokk most? (0-100%)' },
+    { id: 31, name: 'Oldó Szövegek', icon: '📖' },
+    { id: 32, name: 'Kezelői Megjegyzés', icon: '📝' },
+    { id: 33, name: 'Lezárás', icon: '🙏' }
+];
+
+const diagrams = {
+    igenNem: { 
+        title: 'Igen - Nem - Nem most', 
+        options: ['IGEN', 'NEM', 'NEM MOST'],
+        colors: ['#bbf7d0', '#fecaca', '#fde68a']
+    },
+    szazalek: { 
+        title: 'Százalékos mérés', 
+        options: ['0%','10%','20%','30%','40%','50%','60%','70%','80%','90%','100%'],
+        colors: ['#fecaca','#fed7aa','#fde68a','#fef3c7','#d9f99d','#bbf7d0','#a7f3d0','#99f6e4','#a5f3fc','#bfdbfe','#c7d2fe'],
+        confirm: true
+    },
+    eletterulet: { 
+        title: 'Életterületek', 
+        options: ['Munka/Karrier', 'Pénzügyek', 'Szerelem/Párkapcsolat', 'Család', 'Egészség', 'Barátságok', 'Spiritualitás', 'Otthon/Lakhatás', 'Szabadidő/Hobbik', 'Kreativitás/Alkotás', 'Önértékelés/Önbizalom', 'Szexualitás/Intimitás', 'Tanulás/Fejlődés', 'Kommunikáció', 'Céltudatosság/Jövőkép'],
+        colors: ['#fecaca','#fed7aa','#fde68a','#fef3c7','#d9f99d','#bbf7d0','#a7f3d0','#99f6e4','#a5f3fc','#bfdbfe','#c7d2fe','#ddd6fe','#e9d5ff','#fbcfe8','#fca5a5']
+    },
+    erzelmGyoker: {
+        title: 'Érzelmi Gyökér',
+        options: ['Félelem/Szorongás', 'Harag/Düh', 'Szomorúság/Gyász', 'Öröm (elfojtott)', 'Szeretet (hiánya)', 'Bizalom (hiánya)', 'Bűntudat', 'Szégyen', 'Megvetés', 'Undor', 'Meglepetés (trauma)', 'Vágy/Hiány', 'Érzelmi zsibbadás', 'Fájdalom', 'Rejtett vágy', 'Tehetetlenség', 'Elfojtott düh', 'Magány'],
+        colors: ['#fca5a5','#fecaca','#fecdd3','#fcd5d5','#fbcfe8','#fecdd3','#fca5a5','#fecaca','#fcd5d5','#fecdd3','#fca5a5','#f9a8d4','#fbcfe8','#fca5a5','#f9a8d4','#fecdd3','#fca5a5','#fbcfe8']
+    },
+    erzelem: { 
+        title: 'Negatív Érzelmek', 
+        options: ['Harag/Düh', 'Szomorúság/Bánat', 'Félelem/Aggodalom', 'Bűntudat/Szégyen', 'Frusztráció', 'Irigység', 'Elhagyatottság', 'Reménytelenség', 'Kétségbeesés', 'Kishitűség', 'Befelé fordított düh', 'Megkeseredés', 'Tehetetlenség'],
+        colors: ['#fca5a5','#fecaca','#fecdd3','#fca5a5','#fecaca','#fecdd3','#fcd5d5','#fca5a5','#fecaca','#fecdd3','#fca5a5','#fecaca','#fecdd3']
+    },
+    trauma: {
+        title: 'Trauma Mélyítés',
+        options: ['Gyerekkori trauma', 'Bántalmazás', 'Elhanyagolás', 'Szexuális trauma', 'Érzelmi manipuláció', 'Családi konfliktus', 'Válás', 'Haláleset', 'Veszteség', 'Baleset', 'Betegség', 'Iskolai bántalmazás', 'Elárulás', 'Ismétlődő kudarc', 'Öröklött trauma', 'Orvosi beavatkozás', 'Természeti katasztrófa', 'Háborús trauma', 'Szülési trauma'],
+        colors: ['#fca5a5','#fecaca','#fecdd3','#fca5a5','#fecaca','#fed7aa','#fde68a','#fca5a5','#fecaca','#fecdd3','#fed7aa','#fca5a5','#fecaca','#fecdd3','#fca5a5','#fed7aa','#fde68a','#fecaca','#fca5a5']
+    },
+    lelkiSerules: {
+        title: 'Lelki Sérülések',
+        options: ['Elutasítás', 'Elhagyás', 'Megalázás', 'Árulás', 'Igazságtalanság', 'Láthatatlanság', 'Meg nem hallgatás', 'Érzelmi elhanyagolás', 'Fizikai elhanyagolás', 'Túlvédés', 'Határok átlépése', 'Gyermekként kezelés', 'Szülői szerep rákényszerítése', 'Bűnbakképzés', 'Kirekesztés', 'Érzelmi zsarolás', 'Valóság tagadása', 'Állandó kritika', 'Összehasonlítás', 'Feltételes szeretet', 'Meg nem értés', 'Túlterhelés', 'Manipuláció'],
+        colors: ['#fecaca','#fed7aa','#fde68a','#fef3c7','#d9f99d','#bbf7d0','#a7f3d0','#99f6e4','#a5f3fc','#bfdbfe','#c7d2fe','#ddd6fe','#e9d5ff','#f5d0fe','#fbcfe8','#fecdd3','#fca5a5','#fed7aa','#fde68a','#d9f99d','#bbf7d0','#fecaca','#e9d5ff']
+    },
+    kapcsolat: {
+        title: 'Kapcsolati Gyökér',
+        options: ['Én magam', 'Anya', 'Apa', 'Testvér', 'Gyerek', 'Partner', 'Házastárs', 'Volt partner', 'Barát', 'Kolléga', 'Főnök', 'Tanár', 'Mentor', 'Nagyszülő', 'Rokon', 'Isten/Magasabb Én', 'Előző generáció/Ősök', 'Idegen'],
+        colors: ['#fecaca','#fed7aa','#fde68a','#fef3c7','#d9f99d','#bbf7d0','#a7f3d0','#99f6e4','#a5f3fc','#bfdbfe','#c7d2fe','#ddd6fe','#e9d5ff','#f5d0fe','#fbcfe8','#fca5a5','#fed7aa','#fde68a']
+    },
+    eredet: {
+        title: 'Blokk Eredete',
+        options: ['0-3 év', '3-7 év', '7-14 év', '14-21 év', '21-35 év', '35-50 év', '50+ év', 'Méhen belül', 'Születés', 'Korai gyerek', 'Iskolás kor', 'Pubertás', 'Fiatal felnőtt', 'Múlt élet', 'Generációs'],
+        colors: ['#fecaca','#fecdd3','#fed7aa','#fde68a','#fef3c7','#fef9c3','#fef9d5','#fca5a5','#fecaca','#fed7aa','#fde68a','#fef3c7','#fef9c3','#e9d5ff','#ddd6fe']
+    },
+    hiedelem: { 
+        title: 'Korlátozó Hiedelmek', 
+        options: ['Nem vagyok elég jó', 'Nem érdemlem meg', 'Nem vagyok szerethető', 'Gyenge vagyok', 'Mindig kudarcot vallok', 'Veszélyes a siker', 'Nem lehetek boldog', 'Nem vagyok tehetséges', 'Sosem változhatok', 'Nem érdemlem meg a sikert', 'Veszélyes kifejezni magam', 'Mindig beteg vagyok', 'Nem bízhatok senkiben', 'A pénz rossz', 'Mások boldogsága fontosabb / Segítőnek születtem'],
+        colors: ['#bfdbfe','#c7d2fe','#ddd6fe','#e9d5ff','#d8b4fe','#f5d0fe','#e9d5ff','#ddd6fe','#c7d2fe','#bfdbfe','#a5f3fc','#c7d2fe','#ddd6fe','#e9d5ff','#f5d0fe']
+    },
+    test: { 
+        title: 'Testtájékok', 
+        options: ['Fej/Agy', 'Torok/Nyak', 'Szív/Mellkas', 'Gyomor/Has', 'Máj/Epehólyag', 'Vese', 'Hát/Gerinc', 'Derék/Ágyék', 'Csípő/Medence', 'Végtagok', 'Idegrendszer', 'Szem', 'Fül'],
+        colors: ['#f5f3ff','#ede9fe','#e9d5ff','#ddd6fe','#d8b4fe','#c4b5fd','#e0d5f5','#ddd6fe','#d8b4fe','#c4b5fd','#ede9fe','#f3e8ff','#f5f3ff']
+    },
+    csakra: {
+        title: 'Csakrák',
+        options: ['Gyökér csakra', 'Szakrális csakra', 'Napfonat csakra', 'Szív csakra', 'Torok csakra', '3. szem', 'Korona csakra'],
+        colors: ['#fecaca','#fed7aa','#fde68a','#bbf7d0','#bfdbfe','#ddd6fe','#e9d5ff']
+    },
+    blokkJelleg: {
+        title: 'Blokk Jellege',
+        options: ['Érzelmi blokk', 'Mentális blokk', 'Fizikai blokk', 'Energetikai blokk', 'Spirituális blokk', 'Karmikus blokk', 'Lelki blokk', 'Családi blokk', 'Ősi/Ancestrális blokk', 'Társadalmi/Kollektív blokk', 'Kapcsolati blokk'],
+        colors: ['#fecaca','#fed7aa','#fde68a','#fef3c7','#d9f99d','#bbf7d0','#a7f3d0','#99f6e4','#a5f3fc','#bfdbfe','#c7d2fe']
+    },
+    vedekezes: {
+        title: 'Védekezési Mechanizmus',
+        options: ['Tagadás', 'Elfojtás', 'Kivetítés', 'Ésszerűsítés', 'Kompenzáció', 'Elkerülés', 'Agresszió', 'Tökéletességre törekvés', 'Kontroll', 'Függőség', 'Disszociáció/Leválás', 'Humor', 'Túlgondolás', 'Ábrándozás/Menekülés', 'Burkolt agresszió', 'Érzelmi távolságtartás'],
+        colors: ['#fde68a','#fef3c7','#fef9c3','#fef9d5','#fde68a','#fed7aa','#fde68a','#fef3c7','#fef9c3','#fef9d5','#fde68a','#fed7aa','#fde68a','#fef3c7','#fed7aa','#fde68a']
+    },
+    szerepek: {
+        title: 'Életszerepek',
+        options: ['Szülő szerepben', 'Partner szerepben', 'Munkavállaló', 'Vezető szerepben', 'Gyerek szerepben', 'Barát szerepben', 'Kolléga szerepben', 'Egyedül/Magánélet', 'Közösségben', 'Alkotó/Kreatív', 'Gyermekként a szüleim előtt', 'Spirituális/Tanító szerepben', 'Segítő/Gyógyító szerepben'],
+        colors: ['#fbcfe8','#fecaca','#fed7aa','#fde68a','#fef3c7','#d9f99d','#bbf7d0','#99f6e4','#bfdbfe','#c7d2fe','#e9d5ff','#ddd6fe','#a7f3d0']
+    },
+    szabotazs: {
+        title: 'Szabotázs Minták',
+        options: ['Halogatás', 'Tökéletesítés', 'Félbehagyás', 'Önkritika', 'Túlvállalás', 'Kontroll igénye', 'Összehasonlítás', 'Küzdelem', 'Gyors feladás', 'Menekülés', 'Kapcsolatok rombolása', 'Nincs szabotázs'],
+        colors: ['#fed7aa','#fde68a','#fef3c7','#fef9c3','#fed7aa','#fde68a','#fef3c7','#fef9c3','#fed7aa','#fde68a','#fef3c7','#fef9c3']
+    },
+    haszon: {
+        title: 'Másodlagos Haszon',
+        options: ['Biztonságot ad', 'Identitást ad', 'Figyelmet kapok', 'Szeretetet kapok', 'Nem kell változnom', 'Nem kell felelősség', 'Elkerülöm a kudarcot', 'Védelmez mások elől', 'Igazol engem', 'Nem kell teljesítenem', 'Sajnálnak/Együttérzést kapok', 'Lojalitás felmenőkkel szemben'],
+        colors: ['#fbcfe8','#f9a8d4','#fecdd3','#fca5a5','#fbcfe8','#f5d0fe','#e9d5ff','#ddd6fe','#d8b4fe','#c7d2fe','#e9d5ff','#f5d0fe']
+    },
+    fogadalom: {
+        title: 'Fogadalmak',
+        options: ['Soha nem leszek mint ő', 'Mindig védeni fogom magam', 'Soha nem engedem meg', 'Mindig erős leszek', 'Soha nem bízom', 'Mindig egyedül csinálom', 'Soha nem fogok sírni', 'Mindig kontroll alatt', 'Örök hűség', 'Családi fogadalom', 'Vallási fogadalom', 'Lélek szerződés', 'Soha nem leszek boldog', 'Mindig áldozat leszek', 'Nem érdemlem meg a jót', 'Soha nem leszek egészséges', 'Nincs fogadalom'],
+        colors: ['#fca5a5','#fecaca','#fecdd3','#fcd5d5','#fca5a5','#fecaca','#fecdd3','#fcd5d5','#fca5a5','#fbcfe8','#fecdd3','#fca5a5','#fecaca','#fecdd3','#fca5a5','#fecaca','#fbcfe8']
+    },
+    mikroszkop: {
+        title: 'Mikroszkóp - További részletek',
+        options: ['Családi minta', 'Társadalmi kondicionálás', 'Kulturális elvárás', 'Nemi szerep', 'Vallási tanítás', 'Iskolai tapasztalat', 'Média hatás', 'Kortárs nyomás', 'Történelmi trauma', 'Kollektív tudattalan', 'Ancestrális átörökítés', 'Lelki szerződés', 'Energetikai kapcsolat', 'Karmikus lenyomat', 'Társlélek befolyás', 'Entitás attachment', 'Átkok/Átkozások', 'Nincs több részlet'],
+        colors: ['#d9f99d','#bbf7d0','#a7f3d0','#99f6e4','#a5f3fc','#bfdbfe','#c7d2fe','#d9f99d','#bbf7d0','#a7f3d0','#99f6e4','#a5f3fc','#bfdbfe','#c7d2fe','#ddd6fe','#bbf7d0','#a7f3d0','#d9f99d']
+    },
+    pozitivErzelem: {
+        title: 'Pozitív Érzelmek',
+        options: ['Öröm', 'Béke', 'Szeretet', 'Hála', 'Szabadság', 'Bizalom', 'Bátorság', 'Remény', 'Lelkesedés', 'Megelégedettség', 'Biztonság', 'Könnyedség', 'Önazonosság', 'Derű'],
+        colors: ['#fef9c3','#fef3c7','#fef9d5','#fde68a','#fef3c7','#d9f99d','#bbf7d0','#a7f3d0','#d9f99d','#bbf7d0','#a7f3d0','#d9f99d','#a7f3d0','#fde68a']
+    },
+    ujHit: {
+        title: 'Új Hiedelmek',
+        options: ['Elég jó vagyok', 'Megérdemlem a jót', 'Szerethető vagyok', 'Erős vagyok', 'Sikereket érek el', 'Biztonságos a siker', 'Boldog lehetek', 'Tehetséges vagyok', 'Változhatok és fejlődhetek', 'Bízom magamban', 'Elfogadom magam', 'Megbocsátok magamnak'],
+        colors: ['#bbf7d0','#a7f3d0','#99f6e4','#a5f3fc','#bbf7d0','#a7f3d0','#99f6e4','#a5f3fc','#bbf7d0','#a7f3d0','#99f6e4','#a5f3fc']
+    },
+    szinek: {
+        title: 'Gyógyító Színek',
+        options: ['Fehér (tisztaság)', 'Arany (bölcsesség)', 'Ezüst (intuíció)', 'Lila (spiritualitás)', 'Kék (kommunikáció)', 'Zöld (gyógyulás)', 'Rózsaszín (szeretet)', 'Narancssárga (kreativitás)', 'Sárga (öröm)', 'Türkiz (védelem)', 'Fekete (védelem/földelés)'],
+        colors: ['#fafafa','#fef3c7','#e5e7eb','#e9d5ff','#bfdbfe','#bbf7d0','#fbcfe8','#fed7aa','#fef3c7','#99f6e4','#374151'],
+        darkSlices: [10]
+    },
+    kristaly: {
+        title: 'Gyógyító Kristályok',
+        options: ['Hegyikristály', 'Ónix', 'Szodalit', 'Tigrisszem', 'Rózsakvarc', 'Hematit', 'Ametiszt', 'Aventurin', 'Achát', 'Citrin', 'Karneol', 'Holdkő', 'Jáspis', 'Howlit', 'Cseresznyekvarc', 'Obszidián'],
+        colors: ['#e5e7eb','#2d3748','#93c5fd','#fcd34d','#fbcfe8','#6b7280','#ddd6fe','#86efac','#d1d5db','#fef3c7','#fed7aa','#f3f4f6','#fca5a5','#fecdd3','#fbb6ce','#4a5568'],
+        darkSlices: [1, 5, 15]
+    }
+};
+
+function motivaloUzenet(v, f) {
+    if (v === null) return '';
+    if (f === 0) return '🌟 Csodálatos — a blokk teljesen feloldódott! Ez egy igazi áttörés volt ma.';
+    if (v >= 60) return '✨ Hatalmas ugrás! Nagyon sokat sikerült elengedni ma — érezd meg ezt a könnyebbséget!';
+    if (v >= 40) return '💚 Jelentős változás történt — a tested és a lelked sokat dolgozott ma, ez meglátszik.';
+    if (v >= 20) return '🌿 Jó haladás! Minden egyes lépés számít, és ma előrébb jutottál.';
+    if (v > 0) return '🙂 Kis lépés, de lépés — a folyamat elindult, és ez már önmagában értékes.';
+    if (v === 0) return '⚡ Az értékek nem változtak — de a feltárás megtörtént, és ez is fontos alapozás.';
+    return '🤍 Néha a blokk először erősödik, mielőtt elenged — ez is a gyógyulás része.';
+}
+
+function barSzin(v) {
+    if (v <= 20) return '#bbf7d0';
+    if (v <= 40) return '#fde68a';
+    if (v <= 60) return '#fed7aa';
+    if (v <= 80) return '#fca5a5';
+    return '#f87171';
+}
+
+function init() {
+    renderStepsGrid();
+    loadStep(0);
+}
+
+function renderStepsGrid() {
+    const grid = document.getElementById('stepsGrid');
+    grid.innerHTML = steps.map((step, i) => {
+        let className = 'step-icon pending';
+        if (i === currentStep) className = 'step-icon active';
+        else if (completedSteps.includes(i)) className = 'step-icon completed';
+        return '<div class="' + className + '" onclick="jumpToStep(' + i + ')" title="' + step.name + '">' + step.icon + '</div>';
+    }).join('');
+    
+    const percent = Math.round((currentStep / steps.length) * 100);
+    document.getElementById('stepInfo').textContent = currentStep + '/' + steps.length + ' lépés';
+    document.getElementById('percentInfo').textContent = percent + '%';
+    document.getElementById('progressBar').style.width = percent + '%';
+}
+
+function loadStep(stepIndex) {
+    currentStep = stepIndex;
+    selectedOptions = [];
+    renderStepsGrid();
+    
+    const step = steps[stepIndex];
+    const card = document.getElementById('contentCard');
+    
+    let html = '<h2>' + step.icon + ' ' + step.name + '</h2>';
+    
+    switch(stepIndex) {
+        case 0:
+            html += '<div class="info-box purple"><p><strong>Üdvözöllek a blokkoldó folyamatban!</strong></p><p style="margin-top: 12px;">Készüljetek fel a munkára: keressetek egy csendes helyet, vegyetek mély lélegzeteket, és nyissátok meg magatokat a változásra.</p><p style="margin-top: 12px;">A kezelő végigkíséri a klienst minden lépésen, megbeszélik a kapott értékeket és közösen dolgoznak a blokk feloldásán.</p></div><div class="info-box blue" style="margin-top: 16px;"><label style="display: block; margin-bottom: 8px; font-weight: 600;">Kliens neve (opcionális):</label><input type="text" id="clientName" placeholder="Név megadása..." value="' + sessionData.clientName + '"></div><button class="btn btn-purple" onclick="saveClientName(); nextStep();">Kezdjük! →</button>';
+            break;
+            
+        case 17: {
+            const t = sessionData.temValues.Testi;
+            const er = sessionData.temValues.Erzelmi;
+            const m = sessionData.temValues.Mentalis;
+            const vanErtek = t > 0 || er > 0 || m > 0;
+            html += '<div class="info-box ' + (vanErtek ? 'green' : 'purple') + '"><p><strong>TEM Mérés - Három dimenzió</strong></p><p style="margin-top: 8px;">' + (vanErtek ? '✅ Az értékek automatikusan beálltak a 14–16. lépés ingás méréseiből. Szükség esetén finomíthatod a csúszkákkal.' : 'Mérd meg az ingával, hogy melyik szinten milyen erős a blokk.') + '</p></div>';
+            html += '<div class="slider-container"><div class="slider-group"><label>🫀 Testi szint (0-100%)</label><div class="slider-wrapper"><input type="range" min="0" max="100" value="' + t + '" class="slider" id="testiSlider" oninput="updateSliderValue(\'Testi\'); updateTEMAnalysis()"><span class="slider-value" id="testiValue">' + t + '%</span></div></div><div class="slider-group"><label>💭 Érzelmi szint (0-100%)</label><div class="slider-wrapper"><input type="range" min="0" max="100" value="' + er + '" class="slider" id="erzelmiSlider" oninput="updateSliderValue(\'Erzelmi\'); updateTEMAnalysis()"><span class="slider-value" id="erzelmiValue">' + er + '%</span></div></div><div class="slider-group"><label>🧠 Mentális szint (0-100%)</label><div class="slider-wrapper"><input type="range" min="0" max="100" value="' + m + '" class="slider" id="mentalisSlider" oninput="updateSliderValue(\'Mentalis\'); updateTEMAnalysis()"><span class="slider-value" id="mentalisValue">' + m + '%</span></div></div></div><div id="temAnalysisBox" style="margin: 16px 0;"></div><div class="btn-grid"><button class="btn btn-secondary" onclick="prevStep()">← Vissza</button><button class="btn btn-purple" onclick="saveTEM()">Mentés és tovább →</button></div>';
+            if (vanErtek) { setTimeout(updateTEMAnalysis, 50); }
+            break;
+        }
+            
+        case 25:
+            html += '<div class="info-box yellow"><p><strong>Most következik az oldás pillanata!</strong></p><p style="margin-top: 12px;">A kezelő kéri az ingát, hogy oldja fel a blokkot. Figyeljétek meg együtt a mozgást, és várjátok meg, amíg megáll.</p></div><div class="info-box green" style="margin-top: 16px;"><p style="text-align: center; font-size: 1.1rem;">✨ <em>"Elengedem ezt a blokkot. Szabaddá válok. Köszönöm a tanulságot, ami mögötte rejlett."</em></p></div><button class="btn btn-purple" onclick="nextStep()">Oldás megtörtént →</button>';
+            break;
+            
+        case 31:
+            generateReleasingText();
+            generateIntegratingText();
+            html += '<div class="info-box purple"><p><strong>Oldó és integráló affirmációk</strong></p><p style="margin-top: 8px;">A kezelő felolvassa az alábbi szövegeket a kliensnek, majd közösen átbeszélik őket. A szövegek szerkeszthetők.</p></div>';
+            
+            // Kezelői jegyzetek összesítve
+            const allNotes = Object.entries(sessionData.notes).filter(([k, v]) => v && v.trim());
+            if (allNotes.length > 0) {
+                html += '<div style="margin-top: 24px; border: 2px solid #f59e0b; border-radius: 12px; overflow: hidden;">';
+                html += '<div style="background: #fef3c7; padding: 12px 16px; display: flex; align-items: center; gap: 8px; cursor: pointer;" onclick="toggleNotesPanel()" id="notesPanelHeader">';
+                html += '<span style="font-size: 1.2rem;">📝</span>';
+                html += '<span style="font-weight: 700; color: #92400e; flex: 1;">Kezelői jegyzetek összesítése (' + allNotes.length + ' lépésnél)</span>';
+                html += '<span id="notesPanelArrow" style="color: #92400e; font-size: 1.1rem;">▼</span>';
+                html += '</div>';
+                html += '<div id="notesPanel" style="padding: 16px; background: #fffbeb; display: block;">';
+                html += '<div style="font-size: 0.82rem; color: #92400e; margin-bottom: 12px; font-style: italic;">✅ Pipáld be azokat a jegyzeteket, amelyek kerüljenek fel a kezelőlapra!</div>';
+                allNotes.forEach(([stepId, note]) => {
+                    const s = steps[stepId];
+                    const stepName = s ? s.icon + ' ' + s.name : ('Lépés ' + stepId);
+                    const isChecked = sessionData.notesOnDoc[stepId] !== false; // alapból be van pipálva
+                    html += '<div style="margin-bottom: 12px; padding: 10px 14px; background: white; border-radius: 8px; border-left: 3px solid #f59e0b;">';
+                    html += '<label style="display: flex; align-items: flex-start; gap: 10px; cursor: pointer;">';
+                    html += '<input type="checkbox" ' + (isChecked ? 'checked' : '') + ' onchange="toggleNoteOnDoc(' + stepId + ', this.checked)" style="margin-top: 3px; width: 16px; height: 16px; accent-color: #9333ea; flex-shrink: 0;">';
+                    html += '<div style="flex: 1;">';
+                    html += '<div style="font-weight: 600; color: #92400e; margin-bottom: 4px; font-size: 0.85rem;">' + stepName + '</div>';
+                    html += '<div style="color: #1f2937; font-size: 0.95rem; white-space: pre-wrap;">' + note.trim() + '</div>';
+                    html += '</div></label>';
+                    html += '</div>';
+                });
+                html += '</div></div>';
+            }
+
+            html += '<h3 style="margin-top: 24px; color: #7e22ce;">📖 Oldó szöveg:</h3>';
+            html += '<textarea id="releasingTextArea" style="min-height: 200px;">' + sessionData.releasingTexts + '</textarea>';
+            html += '<h3 style="margin-top: 24px; color: #7e22ce;">💫 Integráló szöveg:</h3>';
+            html += '<textarea id="integratingTextArea" style="min-height: 200px;">' + sessionData.integratingTexts + '</textarea>';
+            html += '<button class="btn btn-purple" onclick="saveTexts(); nextStep()">Mentés és folytatás →</button>';
+            break;
+            
+        case 32: {
+            const allapotok = [
+                { emoji: '😔', label: 'Nehezen', desc: 'Fáradtan, megterhelten távozott' },
+                { emoji: '😐', label: 'Semlegesen', desc: 'Feldolgozás alatt, vegyes érzésekkel' },
+                { emoji: '🙂', label: 'Megkönnyebbülten', desc: 'Könnyebben, valami elengedett' },
+                { emoji: '😊', label: 'Jól', desc: 'Pozitívan, energikusan' },
+                { emoji: '✨', label: 'Nagyon jól', desc: 'Felszabadultan, boldogan' }
+            ];
+            const mentettAllapot = sessionData.kliensAllapot;
+            html += '<div class="info-box purple"><p><strong>📝 Kezelői Megjegyzések</strong></p><p style="margin-top:8px;">Rögzítsd a kezelés utáni megfigyeléseidet — ez segít a következő alkalomra való felkészülésben.</p></div>';
+            html += '<div style="margin-bottom:24px;"><label style="display:block; font-weight:600; color:#6b21a8; margin-bottom:12px; font-size:1.05rem;">😊 Hogyan távozott a kliens?</label>';
+            html += '<div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap:10px;">';
+            allapotok.forEach(a => {
+                const selected = mentettAllapot === a.label ? 'background:#9333ea; color:white; border-color:#7e22ce;' : 'background:#faf5ff; color:#6b21a8; border-color:#d8b4fe;';
+                html += `<button onclick="selectKliensAllapot('${a.label}')" id="allapot_${a.label}" style="border:2px solid; border-radius:10px; padding:12px 8px; cursor:pointer; font-weight:600; transition:all 0.2s; ${selected}">
+                    <div style="font-size:1.5rem; margin-bottom:4px;">${a.emoji}</div>
+                    <div style="font-size:0.9rem;">${a.label}</div>
+                    <div style="font-size:0.75rem; opacity:0.8; margin-top:2px;">${a.desc}</div>
+                </button>`;
+            });
+            html += '</div></div>';
+            html += '<div style="margin-bottom:24px;"><label style="display:block; font-weight:600; color:#6b21a8; margin-bottom:8px; font-size:1.05rem;">📅 Következő kezelés időpontja</label>';
+            html += '<input type="date" id="kovetkezoKezeles" value="' + sessionData.kovetkezoKezeles + '" style="width:100%; padding:12px; border:2px solid #d8b4fe; border-radius:8px; font-size:1rem; font-family:inherit; color:#1f2937;"></div>';
+            html += '<div style="margin-bottom:24px;"><label style="display:block; font-weight:600; color:#6b21a8; margin-bottom:8px; font-size:1.05rem;">🗒️ Szabad megjegyzés</label>';
+            html += '<textarea id="kezeloiMegjegyzes" placeholder="Megfigyelések, következő alkalomra javaslatok, fontos részletek..." style="width:100%; min-height:140px; padding:12px; border:2px solid #d8b4fe; border-radius:8px; font-size:0.95rem; font-family:inherit; resize:vertical; background:#faf5ff;">' + sessionData.kezeloiMegjegyzes + '</textarea></div>';
+            html += '<div class="btn-grid"><button class="btn btn-secondary" onclick="prevStep()">← Vissza</button><button class="btn btn-purple" onclick="saveKezeloiMegjegyzes()">Mentés és tovább →</button></div>';
+            break;
+        }
+
+        case 33: {
+            const ini = sessionData.measurements.initial ? parseInt(sessionData.measurements.initial) : null;
+            const fin = sessionData.measurements.final ? parseInt(sessionData.measurements.final) : null;
+            const valtozas = (ini !== null && fin !== null) ? ini - fin : null;
+
+            html += '<div class="info-box green"><p><strong>🎉 A blokkoldó kezelés befejeződött!</strong></p><p style="margin-top:8px;">A kezelő most elkészíti a kezelőlapot, amit átad a kliensnek és megtart magának dokumentációként.</p></div>';
+
+            // Összehasonlítás vizuálisan
+            if (ini !== null && fin !== null) {
+                const valtozasSzin = valtozas > 0 ? '#15803d' : valtozas < 0 ? '#b91c1c' : '#6b7280';
+                const valtozasJel = valtozas > 0 ? '▼ ' : valtozas < 0 ? '▲ +' : '= ';
+                html += `<div style="background:#faf5ff; border:2px solid #d8b4fe; border-radius:16px; padding:20px; margin:20px 0;">
+                    <p style="font-weight:700; color:#6b21a8; font-size:1.1rem; margin-bottom:16px; text-align:center;">📊 A kezelés eredménye</p>
+                    <div style="display:flex; align-items:center; gap:12px; margin-bottom:20px;">
+                        <div style="flex:1; text-align:center;">
+                            <div style="font-size:0.8rem; color:#6b7280; font-weight:600; margin-bottom:6px;">KEZDETI ERŐSSÉG</div>
+                            <div style="font-size:2.5rem; font-weight:900; color:#1f2937;">${ini}%</div>
+                            <div style="background:#e5e7eb; border-radius:99px; height:10px; margin-top:8px; overflow:hidden;">
+                                <div style="width:${ini}%; height:100%; background:${barSzin(ini)}; border-radius:99px; transition:width 0.8s ease;"></div>
+                            </div>
+                        </div>
+                        <div style="text-align:center; padding:0 8px;">
+                            <div style="font-size:2rem;">→</div>
+                        </div>
+                        <div style="flex:1; text-align:center;">
+                            <div style="font-size:0.8rem; color:#6b7280; font-weight:600; margin-bottom:6px;">ZÁRÓ ERŐSSÉG</div>
+                            <div style="font-size:2.5rem; font-weight:900; color:#1f2937;">${fin}%</div>
+                            <div style="background:#e5e7eb; border-radius:99px; height:10px; margin-top:8px; overflow:hidden;">
+                                <div style="width:${fin}%; height:100%; background:${barSzin(fin)}; border-radius:99px; transition:width 0.8s ease;"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div style="text-align:center; padding:12px; background:white; border-radius:10px; border:2px solid #e9d5ff;">
+                        <span style="font-size:1.1rem; font-weight:800; color:${valtozasSzin};">${valtozasJel}${Math.abs(valtozas)}% változás</span>
+                    </div>
+                    <p style="margin-top:14px; text-align:center; font-size:0.95rem; line-height:1.7; color:#374151;">${motivaloUzenet(valtozas, fin)}</p>
+                </div>`;
+
+                // TEM összehasonlítás
+                if (sessionData.temValues.Testi > 0 || sessionData.temValues.Erzelmi > 0 || sessionData.temValues.Mentalis > 0) {
+                    html += `<div style="background:white; border:2px solid #e9d5ff; border-radius:12px; padding:16px; margin-bottom:20px;">
+                        <p style="font-weight:700; color:#6b21a8; margin-bottom:12px;">🔺 TEM értékek</p>
+                        <div style="display:flex; gap:8px;">`;
+                    [['🫀','Testi', sessionData.temValues.Testi],['💭','Érzelmi', sessionData.temValues.Erzelmi],['🧠','Mentális', sessionData.temValues.Mentalis]].forEach(([ico, nev, val]) => {
+                        html += `<div style="flex:1; text-align:center; background:${barSzin(val)}; border-radius:8px; padding:10px 4px;">
+                            <div style="font-size:0.8rem; font-weight:600; color:#374151;">${ico} ${nev}</div>
+                            <div style="font-size:1.4rem; font-weight:800; color:#1f2937;">${val}%</div>
+                        </div>`;
+                    });
+                    html += '</div></div>';
+                }
+            }
+
+            // Munkamenet összefoglaló
+            html += '<div class="summary-section"><h3>📋 Munkamenet összefoglaló</h3>';
+            html += '<p><strong>Kliens:</strong> ' + (sessionData.clientName || 'N/A') + '</p>';
+            if (sessionData.kliensAllapot) html += '<p><strong>Távozáskor:</strong> ' + sessionData.kliensAllapot + '</p>';
+            if (sessionData.kovetkezoKezeles) html += '<p><strong>Következő kezelés:</strong> ' + sessionData.kovetkezoKezeles + '</p>';
+            if (Object.keys(sessionData.answers).length > 0) {
+                html += '<p style="margin-top:16px;"><strong>Kiemelt válaszok:</strong></p>';
+                for (let stepId in sessionData.answers) {
+                    const step = steps[stepId];
+                    if (step && sessionData.answers[stepId]) {
+                        html += '<p>• <em>' + step.name + ':</em> ' + sessionData.answers[stepId] + '</p>';
+                    }
+                }
+            }
+            html += '</div>';
+            html += '<button class="btn btn-download" onclick="saveSessionDOCX()">💾 Kezelőlap mentése (.docx)</button>';
+            html += '<button class="btn btn-purple" style="margin-top:16px;" onclick="confirmFinish()">✨ Új kezelés indítása</button>';
+            break;
+        }
+            
+        default:
+            if (step.diagram) {
+                html += '<div class="question-box">❓ ' + step.question + '</div>';
+                html += '<div class="info-box blue"><p>Használd az ingát a válasz megtalálásához. ' + (step.multiple ? 'Több opció is kiválasztható.' : '') + '</p></div>';
+                html += '<button class="btn btn-primary" onclick="openDiagram(\'' + step.diagram + '\', ' + !!step.multiple + ')">Ingás mérés →</button>';
+                // Válasz megjelenítése - TEM lépéseknél külön forrásból
+                let displayAnswer = sessionData.answers[stepIndex];
+                if (!displayAnswer) {
+                    if (stepIndex === 3) displayAnswer = sessionData.measurements.initial;
+                    else if (stepIndex === 14) displayAnswer = sessionData.temValues.Testi ? sessionData.temValues.Testi + '%' : null;
+                    else if (stepIndex === 15) displayAnswer = sessionData.temValues.Erzelmi ? sessionData.temValues.Erzelmi + '%' : null;
+                    else if (stepIndex === 16) displayAnswer = sessionData.temValues.Mentalis ? sessionData.temValues.Mentalis + '%' : null;
+                    else if (stepIndex === 30) displayAnswer = sessionData.measurements.final;
+                }
+                if (displayAnswer) {
+                    html += '<div class="answer-display"><div class="answer-label">Válasz:</div><div class="answer-value">' + displayAnswer + '</div></div>';
+                }
+            } else {
+                html += '<div class="info-box purple"><p>Folytassátok a következő lépéssel.</p></div><button class="btn btn-purple" onclick="nextStep()">Tovább →</button>';
+            }
+    }
+    
+    // Kezelői jegyzetek mező minden lépéshez (kivéve a Kezelői Megjegyzés oldal)
+    if (stepIndex !== 32) {
+        const savedNote = sessionData.notes[stepIndex] || '';
+        html += `<div class="notes-section">
+            <label>📝 Kezelői jegyzetek</label>
+            <textarea id="noteArea" placeholder="Ide írhatod a megfigyeléseket, reakciókat, gondolatokat..." oninput="saveNote(${stepIndex})">${savedNote}</textarea>
+        </div>`;
+    }
+
+    card.innerHTML = html;
+    
+    const navCard = document.getElementById('navigationCard');
+    if (stepIndex > 0 && stepIndex < steps.length - 1 && stepIndex !== 17 && stepIndex !== 31 && stepIndex !== 32) {
+        navCard.style.display = 'block';
+    } else {
+        navCard.style.display = 'none';
+    }
+}
+
+function toggleNoteOnDoc(stepId, checked) {
+    sessionData.notesOnDoc[stepId] = checked;
+}
+
+function toggleNotesPanel() {
+    const panel = document.getElementById('notesPanel');
+    const arrow = document.getElementById('notesPanelArrow');
+    if (panel.style.display === 'none') {
+        panel.style.display = 'block';
+        arrow.textContent = '▼';
+    } else {
+        panel.style.display = 'none';
+        arrow.textContent = '▶';
+    }
+}
+
+function saveNote(stepIndex) {
+    const noteArea = document.getElementById('noteArea');
+    if (noteArea) {
+        sessionData.notes[stepIndex] = noteArea.value;
+    }
+}
+
+function selectKliensAllapot(label) {
+    sessionData.kliensAllapot = label;
+    // Vizuális frissítés
+    document.querySelectorAll('[id^="allapot_"]').forEach(btn => {
+        btn.style.background = '#faf5ff';
+        btn.style.color = '#6b21a8';
+        btn.style.borderColor = '#d8b4fe';
+    });
+    const sel = document.getElementById('allapot_' + label);
+    if (sel) {
+        sel.style.background = '#9333ea';
+        sel.style.color = 'white';
+        sel.style.borderColor = '#7e22ce';
+    }
+}
+
+function saveKezeloiMegjegyzes() {
+    sessionData.kezeloiMegjegyzes = document.getElementById('kezeloiMegjegyzes')?.value || '';
+    sessionData.kovetkezoKezeles = document.getElementById('kovetkezoKezeles')?.value || '';
+    if (!completedSteps.includes(currentStep)) completedSteps.push(currentStep);
+    nextStep();
+}
+
+function saveClientName() {
+    const nameInput = document.getElementById('clientName');
+    if (nameInput) {
+        sessionData.clientName = nameInput.value.trim();
+    }
+}
+
+function updateSliderValue(type) {
+    const slider = document.getElementById(type.toLowerCase() + 'Slider');
+    const valueDisplay = document.getElementById(type.toLowerCase() + 'Value');
+    valueDisplay.textContent = slider.value + '%';
+}
+
+
+function updateTEMAnalysis() {
+    const t = parseInt(document.getElementById('testiSlider')?.value || 0);
+    const er = parseInt(document.getElementById('erzelmiSlider')?.value || 0);
+    const m = parseInt(document.getElementById('mentalisSlider')?.value || 0);
+
+    const box = document.getElementById('temAnalysisBox');
+    if (!box) return;
+    if (t === 0 && er === 0 && m === 0) { box.innerHTML = ''; return; }
+
+    const atlag = Math.round((t + er + m) / 3);
+    const spread = Math.max(t, er, m) - Math.min(t, er, m);
+
+    const dims = [{n:'testi', v:t, label:'testben'}, {n:'érzelmi', v:er, label:'érzelmekben'}, {n:'mentális', v:m, label:'gondolatokban'}];
+    dims.sort((a,b) => b.v - a.v);
+    const dominans = dims[0];
+    const masodik = dims[1];
+    const harmadik = dims[2];
+
+    // Intenzitás — kliensnek szóló, empatikus megfogalmazás
+    let intenzitas = '';
+    if (atlag <= 20) intenzitas = 'Úgy tűnik, ez most csak finoman van jelen benned — inkább csak egy halvány érzésként, mint valami nehézként.';
+    else if (atlag <= 40) intenzitas = 'Ez a téma érezhetően jelen van, de még nem nyomasztó — valahol a háttérben dolgozik.';
+    else if (atlag <= 60) intenzitas = 'Ez elég erősen érint téged most — érzed a súlyát, és valószínűleg már régóta cipeled.';
+    else if (atlag <= 80) intenzitas = 'Ez nagyon erősen van benned — lehet, hogy ez az egyik legfontosabb dolog, amin most dolgozni kell.';
+    else intenzitas = 'Ez most rendkívül intenzíven van jelen — ez egy mélyen gyökerező, régóta tárolt téma, ami nagyon szeretne végre szabadulni.';
+
+    // Domináns dimenzió — kliensnek érthetően
+    const domUzenet = {
+        'testi': `A tested az, ami a legtöbbet érzi ebből. Lehet, hogy fizikai feszültségként, görcsként, fáradtságként, vagy valamilyen testi érzésként jelenik meg — a tested már régóta hordozza ezt helyetted.`,
+        'érzelmi': `Az érzéseid azok, amik a legjobban megmozdulnak ebben. Lehet, hogy szomorúság, félelem, düh vagy valami nehezen megnevezhető érzés — de ezek az érzések pontosan azt mutatják, hogy hol kell gyógyulni.`,
+        'mentális': `A gondolataid azok, amik a legtöbbet forognak körülötte. Lehet, hogy ismétlődő mondatok a fejedben, "úgyis hiába", "nem vagyok elég" típusú gondolatok — az elméd próbálja feldolgozni, amit még nem sikerült elengedni.`
+    };
+
+    // Kombináció — természetes, értő hangon
+    let kombinacio = '';
+    if (spread <= 15) {
+        kombinacio = `Ez egész lényedet érinti — a tested, az érzéseid és a gondolataid egyszerre jelzik ugyanazt. Ez azt mutatja, hogy ez a téma nagyon mélyen beágyazódott, de ezért nagyon fontos, hogy most foglalkozzatok vele.`;
+    } else if (dominans.v - harmadik.v >= 40) {
+        kombinacio = `Leginkább a ${dominans.label} érzed — ott a legerősebb. A ${masodik.label} is jelen van, de a ${harmadik.label} kevésbé érintett most.`;
+    } else {
+        kombinacio = `Főleg a ${dominans.label} és a ${masodik.label} jelenik meg — ezek kéz a kézben dolgoznak egymással.`;
+    }
+
+    // Bátorítás az átlag alapján
+    let batoritas = '';
+    if (atlag <= 30) {
+        batoritas = '💚 Ez egy jó hír — ez a blokk könnyen elérhető, és jó eséllyel ma már sokat tudtok lazítani rajta.';
+    } else if (atlag <= 60) {
+        batoritas = '🌿 Ez dolgozható — lehet, hogy több réteg van alatta, de minden lépés számít, és már az is változás, hogy itt vagy és foglalkozol vele.';
+    } else {
+        batoritas = '🤍 Ez egy nagy és fontos munka — ne ijedj meg az erős értékektől. Az, hogy ilyen intenzíven jelen van, azt is jelenti, hogy nagyon készen áll arra, hogy végre elengedhesd.';
+    }
+
+    const szoveg = domUzenet[dominans.n] + ' ' + kombinacio + ' ' + batoritas;
+
+    // Vizuális jelző a három értékhez
+    function szinSav(v) {
+        if (v <= 20) return '#bbf7d0';
+        if (v <= 40) return '#fde68a';
+        if (v <= 60) return '#fed7aa';
+        if (v <= 80) return '#fca5a5';
+        return '#f87171';
+    }
+
+    box.innerHTML = `
+        <div style="background:#faf5ff; border:2px solid #d8b4fe; border-radius:12px; padding:16px; margin-top:0;">
+            <p style="font-weight:700; color:#6b21a8; margin-bottom:12px;">🔍 TEM Elemzés</p>
+            <div style="display:flex; gap:8px; margin-bottom:14px;">
+                <div style="flex:1; text-align:center; background:${szinSav(t)}; border-radius:8px; padding:8px 4px;">
+                    <div style="font-size:0.75rem; font-weight:600; color:#374151;">🫀 Testi</div>
+                    <div style="font-size:1.3rem; font-weight:800; color:#1f2937;">${t}%</div>
+                </div>
+                <div style="flex:1; text-align:center; background:${szinSav(er)}; border-radius:8px; padding:8px 4px;">
+                    <div style="font-size:0.75rem; font-weight:600; color:#374151;">💭 Érzelmi</div>
+                    <div style="font-size:1.3rem; font-weight:800; color:#1f2937;">${er}%</div>
+                </div>
+                <div style="flex:1; text-align:center; background:${szinSav(m)}; border-radius:8px; padding:8px 4px;">
+                    <div style="font-size:0.75rem; font-weight:600; color:#374151;">🧠 Mentális</div>
+                    <div style="font-size:1.3rem; font-weight:800; color:#1f2937;">${m}%</div>
+                </div>
+                <div style="flex:1; text-align:center; background:${szinSav(atlag)}; border-radius:8px; padding:8px 4px;">
+                    <div style="font-size:0.75rem; font-weight:600; color:#374151;">⚖️ Átlag</div>
+                    <div style="font-size:1.3rem; font-weight:800; color:#1f2937;">${atlag}%</div>
+                </div>
+            </div>
+            <p style="font-size:0.85rem; color:#374151; margin-bottom:6px;"><strong>Intenzitás:</strong> ${intenzitas}</p>
+            <p style="line-height:1.75; color:#1f2937; font-size:0.95rem;">${szoveg}</p>
+        </div>`;
+}
+
+function saveTEM() {
+    sessionData.temValues.Testi = parseInt(document.getElementById('testiSlider').value);
+    sessionData.temValues.Erzelmi = parseInt(document.getElementById('erzelmiSlider').value);
+    sessionData.temValues.Mentalis = parseInt(document.getElementById('mentalisSlider').value);
+    
+    if (!completedSteps.includes(currentStep)) {
+        completedSteps.push(currentStep);
+    }
+    nextStep();
+}
+
+function saveTexts() {
+    sessionData.releasingTexts = document.getElementById('releasingTextArea').value;
+    sessionData.integratingTexts = document.getElementById('integratingTextArea').value;
+}
+
+function createCircleDiagram(diag, type) {
+    const opts = diag.options;
+    const colors = diag.colors;
+    const angleStep = 360 / opts.length;
+    const centerX = 300, centerY = 300, radius = 250;
+    
+    let paths = '';
+    
+    opts.forEach(function(opt, i) {
+        const angle1 = (i * angleStep - 90) * Math.PI / 180;
+        const angle2 = ((i + 1) * angleStep - 90) * Math.PI / 180;
+        const x1 = centerX + radius * Math.cos(angle1);
+        const y1 = centerY + radius * Math.sin(angle1);
+        const x2 = centerX + radius * Math.cos(angle2);
+        const y2 = centerY + radius * Math.sin(angle2);
+        
+        const midAngle = (angle1 + angle2) / 2;
+        const textRadius = radius * 0.65;
+        const textX = centerX + textRadius * Math.cos(midAngle);
+        const textY = centerY + textRadius * Math.sin(midAngle);
+        
+        let rotationAngle = (midAngle * 180 / Math.PI);
+        
+        const escaped = opt.replace(/'/g, '&#39;');
+        const textLen = opt.length;
+        const fontSize = textLen > 25 ? 10 : (textLen > 20 ? 11 : (textLen > 15 ? 12 : (textLen > 10 ? 13 : 14)));
+        
+        const isDark = diag.darkSlices && diag.darkSlices.includes(i);
+        const textColor = isDark ? '#ffffff' : '#1f2937';
+        const textShadow = isDark ? '0px 0px 4px rgba(0,0,0,0.8)' : '0px 0px 4px rgba(255,255,255,0.9)';
+
+        paths += '<path class="diagram-sector" data-option="' + escaped + '" d="M' + centerX + ',' + centerY + ' L' + x1 + ',' + y1 + ' A' + radius + ',' + radius + ' 0 0,1 ' + x2 + ',' + y2 + ' Z" fill="' + colors[i] + '" onclick="toggleOption(\'' + escaped + '\', ' + !!steps[currentStep].multiple + ')" style="cursor: pointer; transition: all 0.2s; stroke: #fff; stroke-width: 2;" onmouseover="this.style.opacity=0.8; this.style.strokeWidth=3;" onmouseout="this.style.opacity=1; this.style.strokeWidth=2;" />';
+        // Két sorba törés: / karakternél, vagy ha túl hosszú, félúton
+        let textContent;
+        const lineHeight = fontSize * 1.2;
+        if (opt.includes(' / ')) {
+            const parts = opt.split(' / ');
+            textContent = '<tspan x="' + textX + '" dy="-' + (lineHeight/2) + '">' + parts[0] + '</tspan>' +
+                          '<tspan x="' + textX + '" dy="' + lineHeight + '">' + parts[1] + '</tspan>';
+        } else if (opt.length > 18) {
+            const words = opt.split(' ');
+            const mid = Math.ceil(words.length / 2);
+            const line1 = words.slice(0, mid).join(' ');
+            const line2 = words.slice(mid).join(' ');
+            textContent = '<tspan x="' + textX + '" dy="-' + (lineHeight/2) + '">' + line1 + '</tspan>' +
+                          '<tspan x="' + textX + '" dy="' + lineHeight + '">' + line2 + '</tspan>';
+        } else {
+            textContent = opt;
+        }
+        paths += '<text x="' + textX + '" y="' + textY + '" font-size="' + fontSize + '" text-anchor="middle" dominant-baseline="middle" transform="rotate(' + rotationAngle + ' ' + textX + ' ' + textY + ')" style="pointer-events: none; font-weight: bold; fill: ' + textColor + '; text-shadow: ' + textShadow + ';">' + textContent + '</text>';
+    });
+    
+    return '<svg viewBox="0 0 600 600" style="width: 100%; max-width: 600px; height: auto; margin: 20px auto; display: block;">' + paths + '</svg>';
+}
+
+function openDiagram(type, isMultiple) {
+    const diag = diagrams[type];
+    if (!diag) return;
+    
+    const step = steps[currentStep];
+    document.getElementById('diagramTitle').textContent = diag.title;
+    document.getElementById('diagramQuestion').textContent = step.question || '';
+    
+    // Restore previously selected options
+    if (sessionData.answers[currentStep]) {
+        selectedOptions = sessionData.answers[currentStep].split(', ');
+    } else {
+        selectedOptions = [];
+    }
+    
+    let html = createCircleDiagram(diag, type);
+    html += '<div class="diagram-grid" style="margin-top: 24px;">';
+    diag.options.forEach(function(opt, i) {
+        const isSelected = selectedOptions.includes(opt);
+        const selectedClass = isSelected ? ' selected' : '';
+        const displayOpt = opt;
+        html += '<button class="diagram-button' + selectedClass + '" data-option="' + opt.replace(/'/g, "&#39;") + '" onclick="toggleOption(\'' + opt.replace(/'/g, "&#39;") + '\', ' + isMultiple + ')">' + displayOpt + '</button>';
+    });
+    html += '</div>';
+    
+    if (isMultiple) {
+        html += '<button class="btn btn-purple" style="margin-top: 16px;" onclick="saveMultipleOptions()">Kiválasztás mentése</button>';
+        html += '<button class="btn btn-skip" style="margin-top: 8px;" onclick="skipDiagram()">Kihagyás</button>';
+    } else if (diag.confirm) {
+        html += '<button class="btn btn-purple" style="margin-top: 16px;" onclick="saveConfirmOption()">Tovább →</button>';
+        html += '<button class="btn btn-skip" style="margin-top: 8px;" onclick="skipDiagram()">Kihagyás</button>';
+    } else {
+        html += '<button class="btn btn-skip" style="margin-top: 16px;" onclick="skipDiagram()">Kihagyás</button>';
+    }
+    html += '<button class="btn btn-secondary" style="margin-top: 8px;" onclick="closeDiagram()">Bezárás</button>';
+    
+    document.getElementById('diagramContent').innerHTML = html;
+    document.getElementById('diagramModal').classList.add('active');
+    
+    // Betűméret igazítása: ha csak pár betű lóg át, csökkentjük a méretet
+    requestAnimationFrame(() => fitButtonTexts());
+}
+
+function fitButtonTexts() {
+    const buttons = document.querySelectorAll('.diagram-button');
+    buttons.forEach(btn => {
+        btn.style.fontSize = '15px';
+        btn.style.whiteSpace = 'nowrap';
+        
+        let fontSize = 15;
+        while (btn.scrollWidth > btn.offsetWidth && fontSize > 13) {
+            fontSize -= 0.5;
+            btn.style.fontSize = fontSize + 'px';
+        }
+
+        // Ha 13px-en még mindig nem fér el, sortörés 14px-en
+        if (btn.scrollWidth > btn.offsetWidth) {
+            btn.style.whiteSpace = 'normal';
+            btn.style.fontSize = '14px';
+        }
+    });
+}
+
+function toggleOption(option, isMultiple) {
+    const index = selectedOptions.indexOf(option);
+    
+    if (isMultiple) {
+        // Multiple selection mode
+        if (index > -1) {
+            selectedOptions.splice(index, 1);
+        } else {
+            selectedOptions.push(option);
+        }
+        // Update button states
+        const buttons = document.querySelectorAll('.diagram-button');
+        buttons.forEach(btn => {
+            if (btn.getAttribute('data-option') === option) {
+                btn.classList.toggle('selected');
+            }
+        });
+    } else {
+        // Single selection mode
+        const diag = diagrams[steps[currentStep].diagram];
+        if (diag && diag.confirm) {
+            // Confirm mód: csak jelöljük ki, nem zárjuk be
+            selectedOptions = [option];
+            document.querySelectorAll('.diagram-button').forEach(btn => {
+                btn.classList.toggle('selected', btn.getAttribute('data-option') === option);
+            });
+            // SVG cikkelyek kiemelése
+            document.querySelectorAll('.diagram-sector').forEach(path => {
+                path.style.opacity = path.getAttribute('data-option') === option ? '0.7' : '1';
+                path.style.strokeWidth = path.getAttribute('data-option') === option ? '4' : '2';
+            });
+        } else {
+            // Azonnali mentés
+            if (currentStep === 3) {
+                sessionData.measurements.initial = option;
+            } else if (currentStep === 14) {
+                sessionData.temValues.Testi = parseInt(option);
+            } else if (currentStep === 15) {
+                sessionData.temValues.Erzelmi = parseInt(option);
+            } else if (currentStep === 16) {
+                sessionData.temValues.Mentalis = parseInt(option);
+            } else if (currentStep === 30) {
+                sessionData.measurements.final = option;
+            } else {
+                sessionData.answers[currentStep] = option;
+            }
+            closeDiagram();
+            if (!completedSteps.includes(currentStep)) completedSteps.push(currentStep);
+            loadStep(currentStep);
+        }
+    }
+}
+
+function saveConfirmOption() {
+    if (selectedOptions.length === 0) return;
+    const option = selectedOptions[0];
+    if (currentStep === 3) {
+        sessionData.measurements.initial = option;
+    } else if (currentStep === 14) {
+        sessionData.temValues.Testi = parseInt(option);
+    } else if (currentStep === 15) {
+        sessionData.temValues.Erzelmi = parseInt(option);
+    } else if (currentStep === 16) {
+        sessionData.temValues.Mentalis = parseInt(option);
+    } else if (currentStep === 30) {
+        sessionData.measurements.final = option;
+    } else {
+        sessionData.answers[currentStep] = option;
+    }
+    closeDiagram();
+    if (!completedSteps.includes(currentStep)) completedSteps.push(currentStep);
+    loadStep(currentStep);
+}
+
+function saveMultipleOptions() {
+    if (selectedOptions.length > 0) {
+        sessionData.answers[currentStep] = selectedOptions.join(', ');
+    }
+    
+    closeDiagram();
+    
+    if (!completedSteps.includes(currentStep)) {
+        completedSteps.push(currentStep);
+    }
+    
+    loadStep(currentStep);
+}
+
+function skipDiagram() {
+    sessionData.answers[currentStep] = 'Kihagyva';
+    
+    closeDiagram();
+    
+    if (!completedSteps.includes(currentStep)) {
+        completedSteps.push(currentStep);
+    }
+    
+    loadStep(currentStep);
+}
+
+function closeDiagram() {
+    document.getElementById('diagramModal').classList.remove('active');
+}
+
+function generateReleasingText() {
+    let parts = [];
+    
+    parts.push("Elengedem ezt a blokkot, amely eddig visszatartott az életemben.");
+    
+    if (sessionData.answers[3]) {
+        parts.push("Felszabadulok a(z) " + sessionData.answers[3].toLowerCase() + " területén működő korlátaimtól.");
+    }
+    
+    if (sessionData.answers[4] || sessionData.answers[5]) {
+        const emotion = sessionData.answers[5] || sessionData.answers[4];
+        parts.push("Elengedem a " + emotion.toLowerCase() + " érzését, amely áthatotta a létemet.");
+    }
+    
+    if (sessionData.answers[6]) {
+        parts.push("Gyógyítom a " + sessionData.answers[6].toLowerCase() + " nyomait.");
+    }
+    
+    if (sessionData.answers[7]) {
+        parts.push("Feloldozom magam a " + sessionData.answers[7].toLowerCase() + " fájdalmától.");
+    }
+    
+    if (sessionData.answers[8]) {
+        parts.push("Békében elengedem azt, ami a " + sessionData.answers[8].toLowerCase() + " kapcsolatából eredt.");
+    }
+    
+    if (sessionData.answers[10]) {
+        parts.push("Nem hiszek tovább abban, hogy \"" + sessionData.answers[10].toLowerCase() + "\".");
+    }
+    
+    if (sessionData.answers[22] && sessionData.answers[22] !== 'Nincs fogadalom') {
+        parts.push("Feloldom a fogadalmat: \"" + sessionData.answers[22].toLowerCase() + "\".");
+    }
+    
+    if (sessionData.answers[18]) {
+        parts.push("Nem szükséges többé a " + sessionData.answers[18].toLowerCase() + ", védtelen vagyok és ez rendben van.");
+    }
+    
+    parts.push("Köszönöm a tanulságot, amit ez a blokk hozott számomra.");
+    parts.push("Most szabadon engedem, és nyitott vagyok az új lehetőségekre.");
+    
+    sessionData.releasingTexts = parts.join('\n\n');
+}
+
+function generateIntegratingText() {
+    let parts = [];
+    
+    parts.push("Elfogadom az új valóságomat, amelyben szabad és egész vagyok.");
+    
+    if (sessionData.answers[26]) {
+        parts.push(sessionData.answers[26] + " tölti el a szívemet és a testemet.");
+    }
+    
+    if (sessionData.answers[27]) {
+        parts.push("Új hitem: " + sessionData.answers[27] + ".");
+    }
+    
+    if (sessionData.answers[3]) {
+        parts.push("A(z) " + sessionData.answers[3].toLowerCase() + " területén szabadon kibontakozom.");
+    }
+    
+    if (sessionData.answers[8]) {
+        parts.push("Egészséges és tápláló kapcsolatokat építek, szabadon és szeretettel.");
+    }
+    
+    if (sessionData.answers[11]) {
+        parts.push("A testem " + sessionData.answers[11].toLowerCase() + " területe gyógyul és erősödik.");
+    }
+    
+    if (sessionData.answers[12]) {
+        parts.push("A " + sessionData.answers[12].toLowerCase() + " harmonizálódik és áramlik bennem az energia.");
+    }
+    
+    if (sessionData.answers[28]) {
+        const szin = sessionData.answers[28].split('(')[0].trim();
+        parts.push(szin + " fény vesz körül és gyógyít.");
+    }
+    
+    if (sessionData.answers[29]) {
+        parts.push(sessionData.answers[29] + " energiája támogat és erősít.");
+    }
+    
+    parts.push("Hálás vagyok a változásért és az új lehetőségekért.");
+    parts.push("Bizalommal lépek előre az életemben, tudva, hogy megérdemlem a jót.");
+    
+    sessionData.integratingTexts = parts.join('\n\n');
+}
+
+function saveSessionDOCX() {
+    // Make sure texts are generated
+    if (!sessionData.releasingTexts) {
+        generateReleasingText();
+    }
+    if (!sessionData.integratingTexts) {
+        generateIntegratingText();
+    }
+    
+    sessionData.timestamp = new Date().toISOString();
+    const datum = new Date(sessionData.timestamp).toLocaleString('hu-HU');
+    const clientInfo = sessionData.clientName || 'N/A';
+    
+    // Build HTML content
+    let htmlContent = `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; }
+        h1 { text-align: center; color: #9333ea; }
+        h2 { color: #7e22ce; margin-top: 30px; border-bottom: 2px solid #9333ea; padding-bottom: 5px; }
+        p { margin: 10px 0; line-height: 1.6; }
+        .info { margin: 20px 0; }
+    </style>
+</head>
+<body>
+    <h1>INGÁS BLOKKOLDÓ KEZELŐLAP</h1>
+    <div class="info">
+        <p><strong>Kliens:</strong> ${clientInfo}</p>
+        <p><strong>Dátum:</strong> ${datum}</p>
+    </div>
+    
+    <h2>MÉRÉSEK</h2>
+    <p><strong>Kezdeti mérés:</strong> ${sessionData.measurements.initial || 'N/A'}</p>
+    <p><strong>Záró mérés:</strong> ${sessionData.measurements.final || 'N/A'}</p>
+    
+    <h2>TEM MÉRÉS (Testi-Érzelmi-Mentális)</h2>
+    <p><strong>Testi szint:</strong> ${sessionData.temValues.Testi}%</p>
+    <p><strong>Érzelmi szint:</strong> ${sessionData.temValues.Erzelmi}%</p>
+    <p><strong>Mentális szint:</strong> ${sessionData.temValues.Mentalis}%</p>
+    
+    <h2>FELTÁRT TERÜLETEK</h2>`;
+    
+    // Add answers
+    for (let stepId in sessionData.answers) {
+        const step = steps[stepId];
+        if (step && sessionData.answers[stepId]) {
+            htmlContent += `<p><strong>${step.name}:</strong> ${sessionData.answers[stepId]}</p>`;
+        }
+    }
+    
+    // Notes section
+    const hasNotes = Object.keys(sessionData.notes).some(k => sessionData.notes[k] && sessionData.notes[k].trim() && sessionData.notesOnDoc[k] !== false);
+    if (hasNotes) {
+        htmlContent += `<h2>KEZELŐI JEGYZETEK</h2>`;
+        for (let stepId in sessionData.notes) {
+            const note = sessionData.notes[stepId];
+            if (note && note.trim() && sessionData.notesOnDoc[stepId] !== false) {
+                const step = steps[stepId];
+                const stepName = step ? step.icon + ' ' + step.name : ('Lépés ' + stepId);
+                htmlContent += `<p><strong>${stepName}:</strong><br>${note.replace(/\n/g, '<br>')}</p>`;
+            }
+        }
+    }
+
+    // Releasing text
+    htmlContent += `<h2>OLDÓ SZÖVEG</h2>`;
+    const releasingLines = sessionData.releasingTexts.split('\n\n');
+    releasingLines.forEach(line => {
+        if (line.trim()) {
+            htmlContent += `<p>${line.trim()}</p>`;
+        }
+    });
+    
+    // Integrating text
+    htmlContent += `<h2>INTEGRÁLÓ SZÖVEG</h2>`;
+    const integratingLines = sessionData.integratingTexts.split('\n\n');
+    integratingLines.forEach(line => {
+        if (line.trim()) {
+            htmlContent += `<p>${line.trim()}</p>`;
+        }
+    });
+    
+    // Kezelői megjegyzések
+    if (sessionData.kliensAllapot || sessionData.kovetkezoKezeles || sessionData.kezeloiMegjegyzes) {
+        htmlContent += `<h2>KEZELŐI MEGJEGYZÉSEK</h2>`;
+        if (sessionData.kliensAllapot) htmlContent += `<p><strong>Kliens állapota távozáskor:</strong> ${sessionData.kliensAllapot}</p>`;
+        if (sessionData.kovetkezoKezeles) htmlContent += `<p><strong>Következő kezelés:</strong> ${sessionData.kovetkezoKezeles}</p>`;
+        if (sessionData.kezeloiMegjegyzes) htmlContent += `<p><strong>Megjegyzés:</strong> ${sessionData.kezeloiMegjegyzes}</p>`;
+    }
+
+    // Signature
+    htmlContent += `
+    <h2 style="text-align: center; margin-top: 50px;">KEZELÉS VÉGE</h2>
+    <p style="margin-top: 30px;">Kezelő aláírása: _______________________</p>
+    <p style="margin-top: 20px;"><strong>Megjegyzések:</strong></p>
+    <p>_______________________________________________________________</p>
+    <p>_______________________________________________________________</p>
+</body>
+</html>`;
+    
+    // Create blob and save
+    const blob = new Blob([htmlContent], { type: 'application/msword' });
+    const fileName = sessionData.clientName ? 
+        'Kezelolap_' + sessionData.clientName.replace(/\s+/g, '_') + '_' + new Date().toISOString().slice(0,10) + '.doc' : 
+        'Kezelolap_' + new Date().toISOString().slice(0,10) + '.doc';
+    
+    saveAs(blob, fileName);
+    alert('✅ Kezelőlap sikeresen mentve!\n\n' + fileName + '\n\n(A fájl HTML alapú .doc formátumban lett mentve, amit a Word meg tud nyitni és át tud konvertálni .docx-re)');
+}
+
+function nextStep() {
+    if (currentStep < steps.length - 1) {
+        if (!completedSteps.includes(currentStep)) {
+            completedSteps.push(currentStep);
+        }
+        loadStep(currentStep + 1);
+    }
+}
+
+function prevStep() {
+    if (currentStep > 0) {
+        loadStep(currentStep - 1);
+    }
+}
+
+function jumpToStep(index) {
+    loadStep(index);
+}
+
+function confirmFinish() {
+    if (confirm('🙏 Új kezelést indítasz? A jelenlegi adatok elvesznek, ha nem mentetted el!')) {
+        resetSession();
+    }
+}
+
+function resetSession() {
+    currentStep = 0;
+    completedSteps = [];
+    selectedOptions = [];
+    sessionData = {
+        answers: {},
+        notes: {},
+        notesOnDoc: {},
+        measurements: { initial: null, final: null },
+        temValues: { Testi: 0, Erzelmi: 0, Mentalis: 0 },
+        releasingTexts: '',
+        integratingTexts: '',
+        timestamp: null,
+        clientName: '',
+        kezeloiMegjegyzes: '',
+        kovetkezoKezeles: '',
+        kliensAllapot: ''
+    };
+    init();
+}
+
+function openSearch() {
+    document.getElementById('searchOverlay').classList.add('active');
+    setTimeout(() => document.getElementById('searchInput').focus(), 50);
+}
+
+function closeSearch() {
+    document.getElementById('searchOverlay').classList.remove('active');
+    document.getElementById('searchInput').value = '';
+    document.getElementById('searchResults').innerHTML = '<div class="search-empty">Kezdj el gépelni a kereséshez...</div>';
+}
+
+function closeSearchOnOverlay(e) {
+    if (e.target === document.getElementById('searchOverlay')) closeSearch();
+}
+
+function highlight(text, query) {
+    if (!query) return text;
+    const re = new RegExp('(' + query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi');
+    return text.replace(re, '<span class="search-highlight">$1</span>');
+}
+
+function doSearch() {
+    const query = document.getElementById('searchInput').value.trim().toLowerCase();
+    const resultsEl = document.getElementById('searchResults');
+
+    if (query.length < 2) {
+        resultsEl.innerHTML = '<div class="search-empty">Kezdj el gépelni a kereséshez...</div>';
+        return;
+    }
+
+    const results = [];
+
+    // 1. Lépés nevekben és kérdésekben keresés
+    steps.forEach(step => {
+        if (step.name.toLowerCase().includes(query) || (step.question && step.question.toLowerCase().includes(query))) {
+            results.push({
+                type: 'Lépés',
+                title: step.icon + ' ' + step.name,
+                sub: step.question || '',
+                action: () => { closeSearch(); jumpToStep(step.id); }
+            });
+        }
+    });
+
+    // 2. Diagram nevekben keresés
+    Object.entries(diagrams).forEach(([diagKey, diag]) => {
+        if (diag.title.toLowerCase().includes(query)) {
+            const relatedSteps = steps.filter(s => s.diagram === diagKey);
+            relatedSteps.forEach(step => {
+                // Csak ha még nem szerepel a lépés a találatok között
+                if (!results.find(r => r.type === 'Lépés' && r.title.includes(step.name))) {
+                    results.push({
+                        type: 'Diagram',
+                        title: highlight(diag.title, query),
+                        sub: step.icon + ' ' + step.name + ' lépésben',
+                        action: () => { closeSearch(); jumpToStep(step.id); }
+                    });
+                }
+            });
+        }
+    });
+
+    // 2. Diagram opciókban keresés
+    Object.entries(diagrams).forEach(([diagKey, diag]) => {
+        diag.options.forEach(opt => {
+            if (opt.toLowerCase().includes(query)) {
+                const relatedSteps = steps.filter(s => s.diagram === diagKey);
+                relatedSteps.forEach(step => {
+                    results.push({
+                        type: 'Diagram opció',
+                        title: highlight(opt, query),
+                        sub: step.icon + ' ' + step.name + ' lépésben',
+                        action: () => { closeSearch(); jumpToStep(step.id); }
+                    });
+                });
+            }
+        });
+    });
+
+    // 3. Kezelői jegyzetekben keresés
+    Object.entries(sessionData.notes).forEach(([stepId, note]) => {
+        if (note && note.toLowerCase().includes(query)) {
+            const step = steps[stepId];
+            const stepName = step ? step.icon + ' ' + step.name : ('Lépés ' + stepId);
+            const idx = note.toLowerCase().indexOf(query);
+            const snippet = '...' + note.substring(Math.max(0, idx - 30), idx + 50).trim() + '...';
+            results.push({
+                type: 'Kezelői jegyzet',
+                title: stepName,
+                sub: highlight(snippet, query),
+                action: () => { closeSearch(); jumpToStep(parseInt(stepId)); }
+            });
+        }
+    });
+
+    // 4. Mentett válaszokban keresés
+    Object.entries(sessionData.answers).forEach(([stepId, answer]) => {
+        if (answer && answer.toLowerCase().includes(query)) {
+            const step = steps[stepId];
+            const stepName = step ? step.icon + ' ' + step.name : ('Lépés ' + stepId);
+            results.push({
+                type: 'Mentett válasz',
+                title: stepName,
+                sub: highlight(answer, query),
+                action: () => { closeSearch(); jumpToStep(parseInt(stepId)); }
+            });
+        }
+    });
+
+    // 5. Oldó és integráló szövegekben keresés
+    if (sessionData.releasingTexts && sessionData.releasingTexts.toLowerCase().includes(query)) {
+        const idx = sessionData.releasingTexts.toLowerCase().indexOf(query);
+        const snippet = '...' + sessionData.releasingTexts.substring(Math.max(0, idx - 30), idx + 50).trim() + '...';
+        results.push({
+            type: 'Oldó szöveg',
+            title: '📖 Oldó Szövegek',
+            sub: highlight(snippet, query),
+            action: () => { closeSearch(); jumpToStep(31); }
+        });
+    }
+    if (sessionData.integratingTexts && sessionData.integratingTexts.toLowerCase().includes(query)) {
+        const idx = sessionData.integratingTexts.toLowerCase().indexOf(query);
+        const snippet = '...' + sessionData.integratingTexts.substring(Math.max(0, idx - 30), idx + 50).trim() + '...';
+        results.push({
+            type: 'Integráló szöveg',
+            title: '💫 Oldó Szövegek',
+            sub: highlight(snippet, query),
+            action: () => { closeSearch(); jumpToStep(31); }
+        });
+    }
+
+    if (results.length === 0) {
+        resultsEl.innerHTML = '<div class="search-empty">Nincs találat: „' + query + '"</div>';
+        return;
+    }
+
+    window.searchResults = results;
+    resultsEl.innerHTML = results.map((r, i) => `
+        <div class="search-result-item" onclick="window.searchResults[${i}].action()">
+            <div class="search-result-type">${r.type}</div>
+            <div class="search-result-title">${r.title}</div>
+            ${r.sub ? '<div class="search-result-sub">' + r.sub + '</div>' : ''}
+        </div>
+    `).join('');
+}
+
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeSearch(); });
+
+init();
+    </script>
+</body>
+</html>
